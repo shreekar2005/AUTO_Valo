@@ -1,46 +1,104 @@
-# NXP HID AI Proxy
+Here is a comprehensive `README.md` file you can use for your project. It breaks down the setup process, explains the difference between your two main scripts, and provides a detailed guide on how to tweak the aiming variables to perfection.
 
-This project captures a specific Region of Interest (ROI) on the screen, runs it through a YOLOv8 AI object detection model on an NVIDIA GPU, and sends physical hardware actuation commands to an NXP i.MX91 board via UDP.
+---
 
-The NXP board acts as a physical USB Gadget (Hardware Proxy), meaning the target computer sees standard USB Mouse/Keyboard inputs, not software-simulated inputs.
+# YOLOv5 NXP Hardware Aim Assist
 
-## Architecture
-1. **Vision Thread (Brain):** Runs YOLOv8 inference to detect targets and apply Exponential Moving Average (EMA) filtering to prevent bounding-box jitter.
-2. **Movement Thread (Hands):** Runs a high-speed (~200Hz) Proportional Controller loop to stream smooth micro-movements to the NXP board.
+This project is a computer vision-based aim assist and auto-shot script. It uses YOLOv5 to detect targets on-screen and sends physical mouse movement commands to an external NXP hardware board over UDP to bypass standard software-level mouse hooks.
 
-## Hotkey Controls
-Ensure the terminal running the Python script has administrator privileges so the `keyboard` module can listen globally.
+**⚠️ DISCLAIMER:** This project is for educational purposes and offline aim-training environments. Modern kernel-level anti-cheats (like Riot Vanguard) actively scan for top-most transparent overlays, high-frequency screen captures (DXGI/GDI), and unauthorized USB hardware descriptors. Using this in live multiplayer environments may result in a Hardware ID (HWID) ban.
 
-* **`[UP ARROW]`** : Toggle Aimbot (Sends 'x' and 'y' mouse coordinates).
-* **`[DOWN ARROW]`** : Toggle Triggerbot (Sends 'b': 1 when crosshair is on target).
-* **`[Q]`** : Quit the program safely.
+## 📂 Project Structure
 
-## UDP Command Protocol (JSON Format)
-The Python server running on the NXP board expects JSON payloads over UDP port `5005`.
+* **`main.py`**: The "Stealth" version. Runs purely in the background with a minimal Tkinter text overlay. Best for performance and actual use.
+* **`main_debug.py`**: The Developer version. Opens an OpenCV window showing exactly what the AI sees, including bounding boxes and your active FOV circle. Use this for tuning your settings in the practice range.
+* **`best.pt`**: Your trained YOLOv5 PyTorch weights (detects the enemy outlines).
+* **`requirements.txt`**: Python dependencies required to run the scripts.
+* **`venv/`**: Your isolated Python virtual environment.
 
-### 1. Mouse Commands
-**Format:** `{"t": "m", "x": <int>, "y": <int>, "b": <int>}`
+## 🚀 Setup & Execution
 
-* `"t"` : Type. `"m"` indicates a Mouse action.
-* `"x"` : X-axis relative movement. Valid range: `-127` to `+127`. (Negative = Left)
-* `"y"` : Y-axis relative movement. Valid range: `-127` to `+127`. (Negative = Up)
-* `"b"` : Button state bitmask. 
-  * `0` = Release all buttons
-  * `1` = Left Click
-  * `2` = Right Click
-  * `4` = Middle Click
+1. **Activate your virtual environment:**
+```bash
+# On Windows:
+venv\Scripts\activate
 
-### 2. Keyboard Commands (Standard HID spec for future use)
-**Format:** `{"t": "k", "m": <int>, "k": [<int>, <int>, ...]}`
+```
 
-* `"t"` : Type. `"k"` indicates a Keyboard action.
-* `"m"` : Modifier keys bitmask (e.g., `2`=Left Shift, `1`=Left Ctrl, `0`=None).
-* `"k"` : List of standard USB HID Keycodes (e.g., `4`='A', `44`='Space').
 
-## Tuning and Configuration
-Inside `yolo_aim.py`, you can adjust the following parameters to suit your screen and sensitivity:
+2. **Install dependencies (if not already done):**
+```bash
+pip install -r requirements.txt
 
-* **`Kp = 0.4`**: Proportional aggression. Increase if aiming feels too slow/lags behind. Decrease if it oscillates/wiggles.
-* **`MAX_STEP = 5`**: Hard speed limit for mouse movement per tick to maintain smoothness.
-* **`DEADZONE = 3`**: Radius in pixels. If the crosshair is within this radius of the target, movement stops to prevent micro-jitters.
-* **`FILTER_ALPHA = 0.25`**: Trust factor for new AI frames vs history. Lower = smoother but slight tracking delay. Higher = snappier but jittery.
+```
+
+
+3. **Run the application:**
+* For debugging and tuning: `python main_debug.py`
+* For stealth performance: `python main.py`
+
+
+
+## ⌨️ Controls
+
+* **[`] (Tilde/Grave)**: Toggle Auto Aim (Smooth tracking)
+* **[CTRL]**: Toggle Auto Shot (Triggerbot)
+* **[UP ARROW]**: Increase FOV (Activation Range)
+* **[DOWN ARROW]**: Decrease FOV (Activation Range)
+* **[PAUSE]**: Emergency kill-switch to shut down the script safely.
+
+---
+
+## ⚙️ Configuration Variables (Tweaking Guide)
+
+Open `main.py` or `main_debug.py` in a text editor to adjust these variables located near the top of the file.
+
+### 🌐 Network Settings
+
+* `BOARD_IP = "192.168.0.1"`: The local IP address of your NXP board.
+* `UDP_PORT = 5005`: The UDP port your NXP board is listening on.
+
+### 🎯 Aiming & Logic Settings
+
+* `SENS = 0.85`
+* **What it does:** Should match your exact in-game mouse sensitivity.
+* **How to tweak:** The script uses this to calculate `AIM_SPEED` (`1 / SENS`). If the script moves your crosshair way too far past the enemy, increase this number. If it barely moves your crosshair at all, decrease this number.
+
+
+* `DEADZONE = 4`
+* **What it does:** Creates a tiny pixel radius around the exact center of the enemy's head where the mouse will stop trying to move.
+* **How to tweak:** If your crosshair infinitely vibrates or shakes when resting on a stationary enemy, **increase** this to 5 or 6.
+
+
+* `FIRE_DELAY = 0.15`
+* **What it does:** The cooldown time (in seconds) between Auto Shot clicks.
+* **How to tweak:** `0.15` equals roughly 6 shots per second. Decrease to `0.05` for faster bursting, or increase to `0.3` for slow, controlled tapping.
+
+
+
+### 🖥️ Vision Settings
+
+* `MONITOR_WIDTH = 1920` & `MONITOR_HEIGHT = 1080`
+* **What it does:** Must match your actual in-game resolution.
+
+
+* `MONITOR_SCALE = 5`
+* **What it does:** Determines the size of the "AI Vision Box" in the center of your screen. A scale of `5` on a 1920x1080 monitor means the AI only looks at a 384x216 pixel box in the dead center.
+* **How to tweak:** Decrease to `4` or `3` to make the AI look at a larger area of your screen (wider FOV limit), but be aware this will drastically lower your FPS.
+
+
+
+### 🌊 Smoothing Settings (The 120Hz Thread)
+
+* `AUTO_AIM_SMOOTHNESS = 0.2`
+* **What it does:** Controls how much of the distance to the target is covered per frame.
+* **How to tweak:** * `0`: Disables smooth tracking entirely (reverts to classic instant "Silent Aim" snapping).
+* `0.1`: Very slow, "legit" looking drag towards the target.
+* `0.4`: Fast, aggressive, snappy lock-on.
+
+
+
+
+* `AUTO_AIM_DAMPING = 0.75`
+* **What it does:** Prevents the 120Hz action thread from over-predicting the enemy's location before the 50Hz camera captures the next frame.
+* **How to tweak:** If the crosshair ping-pongs left and right rapidly while tracking a moving target, **increase** this closer to `1.0`. If the crosshair feels like it's dragging too far behind a moving target, **decrease** this closer to `0.5`.
